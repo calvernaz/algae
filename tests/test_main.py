@@ -1,6 +1,6 @@
 import pytest
 
-from algae.skeleton import fib, main
+from algae.main import fib, main
 
 __author__ = "Cesar Alvernaz"
 __copyright__ = "Cesar Alvernaz"
