@@ -1,6 +1,5 @@
 import argparse
 import logging
-
 import sys
 
 from algae import __version__
@@ -40,13 +39,19 @@ def parse_args(args):
     )
     parser.add_argument(
         "--engine-version",
-        metavar="AURORA_VERSION",
         help="upgrade aurora version"
     )
     parser.add_argument(
         "--clone-identifier",
-        metavar="CLONE_IDENTIFIER",
         help="name identifier of the clone"
+    )
+    parser.add_argument(
+        "--source-cluster-identifier",
+        help="name identifier of the source cluster"
+    )
+    parser.add_argument(
+        "--subnet-group-name",
+        help="name of VPC subnet group"
     )
     parser.add_argument(
         "-v",
@@ -86,8 +91,16 @@ def main(args):
     args = parse_args(args)
     setup_logging(args.loglevel)
 
-    if args.clone_identifier is not None:
-        clone_cluster(args.clone_identifier)
+    # db_subnet_group_name = "default-vpc-0fe4153faea0fd77f"
+
+    # once a clone identifier is provided we will create a clone of the cluster
+    if args.clone_identifier is not None and \
+        args.source_cluster_identifier is not None:
+        clone_cluster(
+            cluster_identifier=args.clone_identifier,
+            source_cluster_identifier=args.source_cluster_identifier,
+            subnet_group_name=args.subnet_group_name
+        )
 
         if args.engine_version is not None:
             create_cluster_db_instances(
@@ -96,11 +109,11 @@ def main(args):
             upgrade_clone_cluster(args.clone_identifier, args.engine_version)
 
             upgrade_clone_cluster_identifier(
-                cluster_identifier="database-1",
+                cluster_identifier=args.source_cluster_identifier,
             )
             upgrade_clone_cluster_identifier(
                 cluster_identifier=args.clone_identifier,
-                new_cluster_identifier="database-1"
+                new_cluster_identifier=args.source_cluster_identifier
             )
 
 

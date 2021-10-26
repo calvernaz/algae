@@ -5,7 +5,6 @@ from enum import Enum
 from json import JSONEncoder
 
 import boto3
-import botocore
 import polling2
 
 _logger = logging.getLogger(__name__)
@@ -62,29 +61,39 @@ def is_instance_available(instance_identifier: str) -> True:
     return response['DBInstances'][0]['DBInstanceStatus'] == 'available'
 
 
-def clone_cluster(cluster_identifier: str):
-    source_cluster_id = "database-1"
-    db_subnet_group_name = "default-vpc-0fe4153faea0fd77f"
+def clone_cluster(cluster_identifier: str,
+                  source_cluster_identifier: str,
+                  subnet_group_name: str):
+    """
+    Clone cluster
+    :param cluster_identifier: the name identifier for the new cluster clone
+    :param source_cluster_identifier: the name identifier of the source cluster
+    :param subnet_group_name: the name of the VPC subnet where the clone will
+    belong
+    """
 
-    _logger.info(f"cloning source cluster \"{source_cluster_id}\" with clone "
-                 f"identifier \"{cluster_identifier}\"")
+    _logger.info(
+        f"cloning source cluster \"{source_cluster_identifier}\" with clone "
+        f"identifier \"{cluster_identifier}\"")
 
     response = client.restore_db_cluster_to_point_in_time(
         DBClusterIdentifier=cluster_identifier,
         RestoreType=RestoreType.COPY_ON_WRITE.value,
-        SourceDBClusterIdentifier=source_cluster_id,
+        SourceDBClusterIdentifier=source_cluster_identifier,
         UseLatestRestorableTime=True,
-        DBSubnetGroupName=db_subnet_group_name
+        DBSubnetGroupName=subnet_group_name
     )
 
     _logger.debug(json.dumps(response, cls=SimpleJSONEncoder))
 
     status_code = response['ResponseMetadata']['HTTPStatusCode']
     if status_code != 200:
-        _logger.error(f"failed to clone {source_cluster_id} with status code "
-                      f"{status_code}")
-        raise Exception(f"failed to clone {source_cluster_id} with status "
-                        f"code {status_code}")
+        _logger.error(
+            f"failed to clone {source_cluster_identifier} with status code "
+            f"{status_code}")
+        raise Exception(
+            f"failed to clone {source_cluster_identifier} with status "
+            f"code {status_code}")
 
     polling2.poll(
         lambda: is_cluster_available(cluster_identifier),
@@ -171,7 +180,6 @@ def upgrade_clone_cluster(cluster_identifier: str, engine_version: str):
 def upgrade_clone_cluster_identifier(cluster_identifier: str,
                                      new_cluster_identifier: str = None,
                                      suffix: str = "backup"):
-
     if not suffix and not new_cluster_identifier:
         raise Exception("it requires suffix or a new identifier")
 
