@@ -89,6 +89,8 @@ def main(args):
 
     if "upgrade-cluster-version" in args.command:
         upgrade_cluster_version(args)
+    if "restore-from-snapshot" in args.command:
+        restore_from_snapshot(args)
 
 
 def run():

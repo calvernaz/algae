@@ -4,8 +4,10 @@ from algae.rds import (
     upgrade_clone_cluster,
     upgrade_clone_cluster_identifier,
 )
+from decorator import timeit
 
 
+@timeit
 def upgrade_cluster_version(args):
     if (
         args.cluster_identifier is not None
