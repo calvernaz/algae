@@ -8,14 +8,12 @@ def setup_logging(loglevel):
     Args:
       loglevel (int): minimum loglevel for emitting messages
     """
-    log_format = "[%(asctime)s] %(levelname)s:%(name)s:%(message)s"
     logging.basicConfig(
         level=loglevel,
         stream=sys.stdout,
-        format=log_format,
+        format="[%(asctime)s] %(levelname)s:%(name)s:%(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
     # tone down a notch dependency logs
     logging.getLogger("botocore").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)

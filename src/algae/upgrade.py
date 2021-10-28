@@ -4,7 +4,7 @@ from algae.rds import (
     upgrade_clone_cluster,
     upgrade_clone_cluster_identifier,
 )
-from decorator import timeit
+from algae.timing import timeit
 
 
 @timeit
@@ -20,9 +20,13 @@ def upgrade_cluster_version(args):
         )
 
         if args.engine_version is not None:
+            db_instance_class = "db.t3.small"
             create_cluster_db_instances(
-                args.cluster_identifier,
+                args.new_cluster_identifier,
+                engine_version=args.engine_version,
+                db_instance_class=db_instance_class,
             )
+
             upgrade_clone_cluster(args.cluster_identifier, args.engine_version)
 
             upgrade_clone_cluster_identifier(

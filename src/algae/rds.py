@@ -26,19 +26,27 @@ class RestoreType(Enum):
     FULL_COPY = "full-copy"
 
 
-def is_cluster_available(cluster_identifier: str) -> True:
+class EngineType(Enum):
+    AURORA = "aurora"
+    AURORA_MYSQL = "aurora-mysql"
+    AURORA_POSTGRESQL = "aurora-postgresql"
+    MARIADB = "mariadb"
+    MYSQL = "mysql"
+
+
+def is_cluster_available(cluster_identifier: str) -> bool:
     response = client.describe_db_clusters(DBClusterIdentifier=cluster_identifier)
     _logger.info(response["DBClusters"][0]["Status"])
     return response["DBClusters"][0]["Status"] == "available"
 
 
-def is_cluster_upgrading(cluster_identifier: str) -> True:
+def is_cluster_upgrading(cluster_identifier: str) -> bool:
     response = client.describe_db_clusters(DBClusterIdentifier=cluster_identifier)
     _logger.info(response["DBClusters"][0]["Status"])
     return response["DBClusters"][0]["Status"] == "upgrading"
 
 
-def is_cluster_renaming(cluster_identifier: str) -> True:
+def is_cluster_renaming(cluster_identifier: str) -> bool:
     try:
         response = client.describe_db_clusters(DBClusterIdentifier=cluster_identifier)
         _logger.info(response["DBClusters"][0]["Status"])
@@ -48,12 +56,22 @@ def is_cluster_renaming(cluster_identifier: str) -> True:
         return True
 
 
-def is_instance_available(instance_identifier: str) -> True:
+def is_instance_available(instance_identifier: str) -> bool:
     response = client.describe_db_instances(
         DBInstanceIdentifier=instance_identifier,
     )
     _logger.info(response["DBInstances"][0]["DBInstanceStatus"])
     return response["DBInstances"][0]["DBInstanceStatus"] == "available"
+
+
+def is_snapshot_available(cluster_identifier: str, snapshot_identifier: str) -> bool:
+    response = client.describe_db_cluster_snapshots(
+        DBClusterIdentifier=cluster_identifier,
+        DBClusterSnapshotIdentifier=snapshot_identifier,
+        SnapshotType="manual",
+    )
+    _logger.info(response["DBClusterSnapshots"][0]["Status"])
+    return response["DBClusterSnapshots"][0]["Status"] == "available"
 
 
 def clone_cluster(
@@ -98,22 +116,25 @@ def clone_cluster(
     )
 
 
-def create_cluster_db_instances(cluster_identifier: str):
+def create_cluster_db_instances(
+    cluster_identifier: str,
+    engine_version: str,
+    db_instance_class: str,
+    engine: EngineType = EngineType.AURORA_MYSQL.value,
+):
     """
     Create a database instance and associate to the cluster.
 
-    :param cluster_identifier: the cluster identifier for the database instance
-    :param engine_version: must be the version compatible with the cluster
+    :param cluster_identifier: the cluster identifier for the database instance`
+    :param engine_version: engine version
+    :param engine: aurora engine type
+    :param db_instance_class: the instance class
     :return:
     """
 
     _logger.info(
-        f"creating cluster database instance in cluster " f"{cluster_identifier}"
+        f"creating cluster database instance in cluster \"{cluster_identifier}\" with version \"{engine_version}\""
     )
-
-    engine = "aurora-mysql"
-    engine_version = "5.7.mysql_aurora.2.07.4"
-    db_instance_class = "db.t3.small"
 
     response = client.create_db_instance(
         DBInstanceIdentifier=f"{cluster_identifier}-instance",
@@ -213,6 +234,65 @@ def upgrade_clone_cluster_identifier(
     polling2.poll(
         lambda: is_cluster_renaming(cluster_identifier), step=60, poll_forever=True
     )
+
+    polling2.poll(
+        lambda: is_cluster_available(new_cluster_identifier), step=60, poll_forever=True
+    )
+
+
+def create_db_cluster_snapshot(cluster_identifier: str, snapshot_identifier: str):
+    _logger.info(
+        f'creating cluster snapshot from "{cluster_identifier}" with identifier "{snapshot_identifier}"'
+    )
+
+    response = client.create_db_cluster_snapshot(
+        DBClusterIdentifier=cluster_identifier,
+        DBClusterSnapshotIdentifier=snapshot_identifier,
+    )
+
+    _logger.debug(json.dumps(response, cls=SimpleJSONEncoder))
+
+    status_code = response["ResponseMetadata"]["HTTPStatusCode"]
+    if status_code != 200:
+        _logger.error(
+            f"failed to snapshot {cluster_identifier} with status code {status_code}"
+        )
+        raise Exception(
+            f"failed to snapshot {cluster_identifier} with status code {status_code}"
+        )
+
+    polling2.poll(
+        lambda: is_snapshot_available(
+            cluster_identifier=cluster_identifier,
+            snapshot_identifier=snapshot_identifier,
+        ),
+        step=60,
+        poll_forever=True,
+    )
+
+
+def restore_cluster_from_snapshot(
+    snapshot_identifier: str, new_cluster_identifier: str, engine_type: EngineType
+):
+    _logger.info(
+        f'restoring cluster from snapshot "{snapshot_identifier}" with identifier "{new_cluster_identifier}"'
+    )
+    response = client.restore_db_cluster_from_snapshot(
+        DBClusterIdentifier=new_cluster_identifier,
+        SnapshotIdentifier=snapshot_identifier,
+        Engine=engine_type,
+    )
+
+    _logger.debug(json.dumps(response, cls=SimpleJSONEncoder))
+
+    status_code = response["ResponseMetadata"]["HTTPStatusCode"]
+    if status_code != 200:
+        _logger.error(
+            f"failed to restore cluster {new_cluster_identifier} with status code {status_code}"
+        )
+        raise Exception(
+            f"failed to restore {new_cluster_identifier} with status code {status_code}"
+        )
 
     polling2.poll(
         lambda: is_cluster_available(new_cluster_identifier), step=60, poll_forever=True

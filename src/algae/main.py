@@ -10,6 +10,8 @@ __license__ = "MIT"
 
 from algae.config import setup_logging
 from algae.upgrade import upgrade_cluster_version
+from algae.snapshot import restore_from_snapshot
+from algae.clone import clone_cluster_in_time
 
 _logger = logging.getLogger(__name__)
 
@@ -44,6 +46,7 @@ def parse_args(args):
         help="set loglevel to INFO",
         action="store_const",
         const=logging.INFO,
+        default=True,
     )
     parser.add_argument(
         "-vv",
@@ -52,11 +55,14 @@ def parse_args(args):
         help="set loglevel to DEBUG",
         action="store_const",
         const=logging.DEBUG,
+        default=False,
     )
 
     sub_parsers = parser.add_subparsers(dest="command")
 
+    #
     # upgrade cluster version sub-parser
+    #
     upgrade_parser = sub_parsers.add_parser(
         "upgrade-cluster-version",
         help="upgrade cluster version",
@@ -70,11 +76,51 @@ def parse_args(args):
     )
     upgrade_parser.add_argument("--subnet-group-name", help="name of VPC subnet group")
 
+    #
     # delete cluster sub-parser
+    #
     delete_parser = sub_parsers.add_parser("delete-cluster", help="delete cluster")
     delete_parser.add_argument(
         "--cluster-identifier", help="name identifier of the cluster"
     )
+
+    #
+    # snapshot cluster sub-parser
+    #
+    snapshot_parser = sub_parsers.add_parser(
+        "restore-from-snapshot", help="creates a cluster snapshot"
+    )
+    snapshot_parser.add_argument(
+        "--cluster-identifier", help="name identifier of the cluster"
+    )
+    snapshot_parser.add_argument(
+        "--snapshot-identifier", help="prefix name identifier of the snapshot"
+    )
+    snapshot_parser.add_argument(
+        "--new-cluster-identifier",
+        help="name identifier for the new cluster created from snapshot",
+    )
+    snapshot_parser.add_argument(
+        "--engine-version", help="upgrade aurora version"
+    )
+
+    #
+    # clone cluster sub-parser
+    #
+    clone_parser = sub_parsers.add_parser(
+        "clone-cluster-in-time", help="clone cluster in some point in time"
+    )
+    clone_parser.add_argument(
+        "--cluster-identifier", help="name identifier of the cluster"
+    )
+    clone_parser.add_argument(
+        "--new-cluster-identifier",
+        help="name identifier for the new cluster created from snapshot",
+    )
+    clone_parser.add_argument(
+        "--engine-version", help="upgrade aurora version"
+    )
+    clone_parser.add_argument("--subnet-group-name", help="name of VPC subnet group")
 
     if len(args) == 0:
         parser.print_help(sys.stderr)
@@ -91,6 +137,8 @@ def main(args):
         upgrade_cluster_version(args)
     if "restore-from-snapshot" in args.command:
         restore_from_snapshot(args)
+    if "clone-cluster-in-time" in args.command:
+        clone_cluster_in_time(args)
 
 
 def run():
