@@ -37,8 +37,6 @@ algae
     Automate Aurora RDS rollouts using blue/green deployment strategy
 
 
-A longer description of your project goes here...
-
 
 .. _pyscaffold-notes:
 
